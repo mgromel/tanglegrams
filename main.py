@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, dendrogram
 import tanglegram as tg
 import numpy as np
+import os
 
 # ----------------------------
 # Helper Functions
@@ -49,16 +50,19 @@ def get_dendrogram_labels(linkage_matrix, sample_names):
     return [sample_names[int(i)] for i in ordered_indices]
 
 def create_tanglegram(
-    linkage_a, linkage_b, labels_a, labels_b, untangle=False, fig_size=(12, 8)
+    linkage_a, linkage_b, labels_a, labels_b, untangle=False, fig_size=(12, 8), name1='file1', name2='file2'
 ):
     """
     Creates and returns a tanglegram figure using two linkage matrices
     and lists of labels.
     """
-    return tg.plot(
+    fig = tg.plot(
         linkage_a, linkage_b, labelsA=labels_a, labelsB=labels_b, 
         sort=untangle, figsize=fig_size
     )
+    fig.text(0.17, 0.92, f"Dendogram for {name1}", ha="center", fontsize=14, fontweight="bold")
+    fig.text(0.83, 0.92, f"Dendogram for {name2}", ha="center", fontsize=14, fontweight="bold")
+    return fig
 
 # ----------------------------
 # Streamlit App
@@ -123,7 +127,7 @@ if 'file1' in st.session_state and 'file2' in st.session_state:
 
         # Create tanglegram
         tanglegram_fig = create_tanglegram(
-            linkage_1, linkage_2, labels_a, labels_b, untangle, (12, 8)
+            linkage_1, linkage_2, labels_a, labels_b, untangle, (12, 8), name1=os.path.splitext(st.session_state['file1'].name)[0], name2=os.path.splitext(st.session_state['file2'].name)[0]
         )
         st.session_state['tanglegram_fig'] = tanglegram_fig
 
