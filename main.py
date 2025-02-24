@@ -7,9 +7,64 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 import tanglegram as tg
 import numpy as np
 
-st.set_page_config(page_title='TangleHCA', page_icon=None, layout="wide")
-# Streamlit UI
-st.title("HCA Tanglegram analysis")
+# ----------------------------
+# Helper Functions
+# ----------------------------
+def load_excel(file):
+    """
+    Loads an Excel file into a DataFrame with the first column as the index.
+    """
+    return pd.read_excel(file, index_col=0)
+
+def standardize_data(df):
+    """
+    Standardizes the given DataFrame and returns the transformed array.
+    """
+    scaler = StandardScaler()
+    return scaler.fit_transform(df)
+
+def compute_distance_matrix(data, distance_metric):
+    """
+    Computes a condensed distance matrix (vector form) and returns both
+    the condensed version and a square-form matrix.
+    """
+    dist_vector = pdist(data, metric=distance_metric)
+    dist_matrix = squareform(dist_vector)
+    return dist_vector, dist_matrix
+
+def generate_linkage(dist_matrix, linkage_method):
+    """
+    Generates and returns the hierarchical clustering linkage based on
+    the provided square-form distance matrix.
+    """
+    return linkage(dist_matrix, method=linkage_method)
+
+def get_dendrogram_labels(linkage_matrix, sample_names):
+    """
+    Produces a dendrogram (without plotting) and returns labels in the
+    same order as the leaves of the dendrogram.
+    """
+    dendro_info = dendrogram(linkage_matrix, no_plot=True)
+    ordered_indices = dendro_info["leaves"]
+    return [sample_names[int(i)] for i in ordered_indices]
+
+def create_tanglegram(
+    linkage_a, linkage_b, labels_a, labels_b, untangle=False, fig_size=(12, 8)
+):
+    """
+    Creates and returns a tanglegram figure using two linkage matrices
+    and lists of labels.
+    """
+    return tg.plot(
+        linkage_a, linkage_b, labelsA=labels_a, labelsB=labels_b, 
+        sort=untangle, figsize=fig_size
+    )
+
+# ----------------------------
+# Streamlit App
+# ----------------------------
+st.set_page_config(page_title='HCA Tanglegram Analysis', layout="wide")
+st.title("HCA Tanglegram Analysis")
 
 # Sidebar for file uploads
 with st.sidebar:
@@ -18,61 +73,63 @@ with st.sidebar:
         file1 = st.file_uploader("Upload first Excel file", type=["xls", "xlsx"])
         file2 = st.file_uploader("Upload second Excel file", type=["xls", "xlsx"])
         submit_files = st.form_submit_button("Upload")
+
+    # Store references to the uploaded files in session state
     if submit_files:
         st.session_state['file1'] = file1
         st.session_state['file2'] = file2
 
-# Layout for parameters and plot
-if ('file1' in st.session_state) and ('file2' in st.session_state):
+# Main layout
+if 'file1' in st.session_state and 'file2' in st.session_state:
     col1, col2 = st.columns([1, 2])
+
     with col1:
         st.header("Settings")
-        distance_metric = st.selectbox("Select Distance metric", [ "euclidean", "sqeuclidean","cityblock","minkowski", "correlation", "cosine","chebyshev", "jaccard", "hamming","canberra"])
-        linkage_method = st.selectbox("Select Linkage method", ["single", "complete", "ward", "average", "weighted", "centroid", "median"])
-        # # Slider for figure size adjustment
-        # fig_size = st.slider("Adjust Figure Size (%)", 50, 100, 75)
-        # scale_factor = fig_size / 100.0
+        distance_metric = st.selectbox(
+            "Select Distance metric",
+            ["euclidean", "sqeuclidean", "cityblock", "minkowski", "correlation", 
+             "cosine", "chebyshev", "jaccard", "hamming", "canberra"]
+        )
+        linkage_method = st.selectbox(
+            "Select Linkage method",
+            ["single", "complete", "ward", "average", "weighted", "centroid", "median"]
+        )
         untangle = st.checkbox("Untangle?")
         submit_button = st.button("Submit")
-    
+
     if submit_button:
-        df1 = pd.read_excel(file1, index_col=0)
-        df2 = pd.read_excel(file2, index_col=0)
-        
-        # Preserve original sample names
+        # Load data
+        df1 = load_excel(st.session_state['file1'])
+        df2 = load_excel(st.session_state['file2'])
+
+        # Keep original sample names
         sample_names = df1.index.tolist()
 
         # Standardize data
-        scaler = StandardScaler()
-        z1 = scaler.fit_transform(df1)
-        z2 = scaler.fit_transform(df2)
+        standardized_1 = standardize_data(df1)
+        standardized_2 = standardize_data(df2)
 
-        # Compute distance matrices
-        dist_vec1 = pdist(z1, metric=distance_metric)
-        dist_vec2 = pdist(z2, metric=distance_metric)
+        # Distance matrices
+        _, dist_matrix_1 = compute_distance_matrix(standardized_1, distance_metric)
+        _, dist_matrix_2 = compute_distance_matrix(standardized_2, distance_metric)
 
-        # Ensure distance matrices are in correct format
-        dist_mat1 = squareform(dist_vec1)
-        dist_mat2 = squareform(dist_vec2)
+        # Linkage matrices
+        linkage_1 = generate_linkage(dist_matrix_1, linkage_method)
+        linkage_2 = generate_linkage(dist_matrix_2, linkage_method)
 
-        # Compute linkage matrices
-        linkage1 = linkage(dist_mat1, method=linkage_method)
-        linkage2 = linkage(dist_mat2, method=linkage_method)
+        # Extract labels from dendrograms
+        labels_a = get_dendrogram_labels(linkage_1, sample_names)
+        labels_b = get_dendrogram_labels(linkage_2, sample_names)
 
-        # Generate dendrograms to extract leaf labels
-        dendro1 = dendrogram(linkage1, no_plot=True)
-        dendro2 = dendrogram(linkage2, no_plot=True)
+        # Create tanglegram
+        tanglegram_fig = create_tanglegram(
+            linkage_1, linkage_2, labels_a, labels_b, untangle, (12, 8)
+        )
+        st.session_state['tanglegram_fig'] = tanglegram_fig
 
-        # Map original sample names to dendrogram order
-        labelsA = [sample_names[int(i)] for i in dendro1["leaves"]]
-        labelsB = [sample_names[int(i)] for i in dendro2["leaves"]]
-        
-        # Generate tanglegram with correct parameter names and adjusted figure size
-        fig = tg.plot(linkage1, linkage2, labelsA=labelsA, labelsB=labelsB, sort=untangle, figsize=(12,8))
-        
-        # Display the plot in the right column
+    if 'tanglegram_fig' in st.session_state:
         with col2:
             st.header("Tanglegram Plot")
-            st.pyplot(fig)
+            st.pyplot(st.session_state['tanglegram_fig'])
 else:
-    st.warning("Please upload both Excel files and submit the parameters to generate the tanglegram.")
+    st.warning("Please upload both Excel files and click 'Upload' on the sidebar.")
