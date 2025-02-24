@@ -100,7 +100,7 @@ if 'file1' in st.session_state and 'file2' in st.session_state:
             "Select Linkage method",
             ["single", "complete", "ward", "average", "weighted", "centroid", "median"]
         )
-        untangle = st.checkbox("Try to untalge")
+        untangle = st.checkbox("Try to untangle")
         annotate = st.checkbox("Show titles")
         submit_button = st.button("Submit")
 
