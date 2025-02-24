@@ -7,6 +7,7 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 import tanglegram as tg
 import numpy as np
 
+st.set_page_config(page_title='TangleHCA', page_icon=None, layout="wide")
 # Streamlit UI
 st.title("HCA Tanglegram analysis")
 
